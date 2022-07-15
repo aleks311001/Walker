@@ -10,13 +10,15 @@ from tqdm.auto import tqdm
 import gym
 import brian2 as b2
 from enum import Enum
-from collections import defaultdict
-import copy
 
-from warnings import filterwarnings
-filterwarnings(action='ignore', category=DeprecationWarning, module='.*brian2.*')
-filterwarnings(action='ignore', category=UserWarning,
-               message='.*WARN: We recommend you to use a symmetric and normalized Box action space.*')
+import warnings
+warnings.filterwarnings(action='ignore', category=DeprecationWarning, module='.*brian2.*')
+warnings.filterwarnings(action='ignore', category=DeprecationWarning,
+                        message='.*the imp module is deprecated in favour of importlib and slated for removal in.*')
+warnings.filterwarnings(action='ignore', category=DeprecationWarning,
+                        message='.*WARN: Initializing wrapper in old step API which returns one bool instead.*')
+warnings.filterwarnings(action='ignore', category=UserWarning,
+                        message='.*WARN: We recommend you to use a symmetric and normalized Box action space.*')
 
 
 class JointNeurons:
@@ -200,36 +202,45 @@ def make_controller(params):
                       w_joint=params[12], t_step=10 * b2.ms)
 
 
-def calc_reward(params, n_iter=100):
+def calc_reward(params, n_iter=300):
     assert (len(params) == 13)
 
-    env = gym.make('BipedalWalker-v3')
-    #     c = Controller(w=params[:8],
-    #                    u_init={
-    #                        Side.LEFT: {Joint.HIP: params[8:10], Joint.KNEE: params[10:12]},
-    #                        Side.RIGHT: {Joint.HIP: params[12:14], Joint.KNEE: params[14:16]},
-    #                    },
-    #                    tau={
-    #                        'u': {Joint.HIP: params[16], Joint.KNEE: params[17]},
-    #                        'v': {Joint.HIP: params[18], Joint.KNEE: params[19]},
-    #                    }, a=params[20:22], u0=params[22], b=params[23],
-    #                    w_joint=params[24], t_step=20 * b2.ms)
+    with warnings.catch_warnings():
+        warnings.filterwarnings(action='ignore', category=DeprecationWarning, module='.*brian2.*')
+        warnings.filterwarnings(action='ignore', category=DeprecationWarning,
+                                message='.*the imp module is deprecated in favour of importlib and slated for.*')
+        warnings.filterwarnings(action='ignore', category=DeprecationWarning,
+                                message='.*WARN: Initializing wrapper in old step API which returns one bool instead.*')
+        warnings.filterwarnings(action='ignore', category=UserWarning,
+                                message='.*WARN: We recommend you to use a symmetric and normalized Box action space.*')
 
-    c = make_controller(params)
+        env = gym.make('BipedalWalker-v3')
+        #     c = Controller(w=params[:8],
+        #                    u_init={
+        #                        Side.LEFT: {Joint.HIP: params[8:10], Joint.KNEE: params[10:12]},
+        #                        Side.RIGHT: {Joint.HIP: params[12:14], Joint.KNEE: params[14:16]},
+        #                    },
+        #                    tau={
+        #                        'u': {Joint.HIP: params[16], Joint.KNEE: params[17]},
+        #                        'v': {Joint.HIP: params[18], Joint.KNEE: params[19]},
+        #                    }, a=params[20:22], u0=params[22], b=params[23],
+        #                    w_joint=params[24], t_step=20 * b2.ms)
 
-    observation = env.reset()
-    total_reward = 0
+        c = make_controller(params)
 
-    for _ in range(n_iter):
-        y = c.step(observation)
-        action = np.array([y[Side.LEFT][Joint.HIP], y[Side.LEFT][Joint.KNEE],
-                           y[Side.RIGHT][Joint.HIP], y[Side.RIGHT][Joint.KNEE]])
-        action = np.clip(action, -1, 1)
-        observation, reward, done, _ = env.step(action)
-        total_reward += reward
-        if done:
-            break
+        observation = env.reset()
+        total_reward = 0
 
-    env.close()
+        for _ in range(n_iter):
+            y = c.step(observation)
+            action = np.array([y[Side.LEFT][Joint.HIP], y[Side.LEFT][Joint.KNEE],
+                               y[Side.RIGHT][Joint.HIP], y[Side.RIGHT][Joint.KNEE]])
+            action = np.clip(action, -1, 1)
+            observation, reward, done, _ = env.step(action)
+            total_reward += reward
+            if done:
+                break
+
+        env.close()
 
     return -total_reward
