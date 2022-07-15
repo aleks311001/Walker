@@ -17,6 +17,8 @@ warnings.filterwarnings(action='ignore', category=DeprecationWarning,
                         message='.*the imp module is deprecated in favour of importlib and slated for removal in.*')
 warnings.filterwarnings(action='ignore', category=DeprecationWarning,
                         message='.*WARN: Initializing wrapper in old step API which returns one bool instead.*')
+warnings.filterwarnings(action='ignore', category=DeprecationWarning,
+                        message='.*WARN: Initializing environment in old step API which returns one bool.*')
 warnings.filterwarnings(action='ignore', category=UserWarning,
                         message='.*WARN: We recommend you to use a symmetric and normalized Box action space.*')
 
@@ -211,6 +213,8 @@ def calc_reward(params, n_iter=300):
                                 message='.*the imp module is deprecated in favour of importlib and slated for.*')
         warnings.filterwarnings(action='ignore', category=DeprecationWarning,
                                 message='.*WARN: Initializing wrapper in old step API which returns one bool instead.*')
+        warnings.filterwarnings(action='ignore', category=DeprecationWarning,
+                                message='.*WARN: Initializing environment in old step API which returns one bool.*')
         warnings.filterwarnings(action='ignore', category=UserWarning,
                                 message='.*WARN: We recommend you to use a symmetric and normalized Box action space.*')
 
