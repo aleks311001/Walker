@@ -151,7 +151,7 @@ class Controller:
 
     def update_f_obs(self, obs):
         t_l, t_r = obs[8], obs[13]
-        theta = [-obs[0], np.pi - obs[4], np.pi - obs[9], -(obs[6] - 1), -(obs[11] - 1)]
+        theta = [-obs[0], np.pi - obs[4], np.pi - obs[9], -(obs[6] - 1)-0.1, -(obs[11] - 1)-0.1]
 
         self.f[Side.RIGHT][Joint.HIP] = self.a[0] * (theta[1] - theta[2] + t_l)
         self.f[Side.LEFT][Joint.HIP] = self.a[0] * (theta[2] - theta[1] + t_r)
@@ -174,13 +174,15 @@ class Controller:
 
 
 def plot_u(controller, s, j):
+    u1 = controller.joints[s][j].u_mon.u1[0]
+    u2 = controller.joints[s][j].u_mon.u2[0]
+    
     plt.figure(figsize=(12, 3))
 
     plt.title(f'{s.value} {j.value}')
-    plt.plot(controller.joints[s][j].u_mon.t / b2.ms,
-             controller.joints[s][j].u_mon.u1[0], label='u1')
-    plt.plot(controller.joints[s][j].u_mon.t / b2.ms,
-             controller.joints[s][j].u_mon.u2[0], label='u2')
+    plt.plot(controller.joints[s][j].u_mon.t / b2.ms, u1, label='u1')
+    plt.plot(controller.joints[s][j].u_mon.t / b2.ms, u2, label='u2')
+    plt.plot(controller.joints[s][j].u_mon.t / b2.ms, np.maximum(0, u1) - np.maximum(0, u2), label='y', c='r', lw=4)
 
     plt.ylabel('u')
     plt.xlabel('Время')
@@ -195,18 +197,50 @@ def plot_all(controller):
     plot_u(controller, Side.RIGHT, Joint.KNEE)
 
 
-def make_controller(params):
+def make_controller(params, t_step=10 * b2.ms):
     return Controller(w=[params[0], 0, 0, params[1], params[2], 0, params[3], 0],
                       u_init={s: {j: (0.0, 0.0) for j in Joint} for s in Side},
                       tau={
                           'u': {Joint.HIP: params[4], Joint.KNEE: params[5]},
                           'v': {Joint.HIP: params[6], Joint.KNEE: params[7]},
                       }, a=params[8:10], u0=params[10], b=params[11],
-                      w_joint=params[12], t_step=10 * b2.ms)
+                      w_joint=params[12], t_step=t_step)
+
+def make_controller3(params):
+    return Controller(w=[-0.607, 0, 0, -0.311, -1.649, 0, -1.934, 0],
+                      u_init={s: {j: (0.0, 0.0) for j in Joint} for s in Side},
+                      tau={
+                          'u': {Joint.HIP: 0.285, Joint.KNEE: 0.143},
+                          'v': {Joint.HIP: 0.302, Joint.KNEE: 0.151},
+                      }, a=(0.124, 0.770), u0=0.805, b=3.078,
+                      w_joint=-2.120, t_step=params[0] * b2.ms)
 
 
-def calc_reward(params, n_iter=750):
-    assert (len(params) == 14)
+def make_controller4(params):
+    return Controller(w=[-0.607, 0, 0, -0.311, -1.649, 0, -1.934, 0],
+                      u_init={s: {j: (params[(k1 * 2 + k2) * 2 + 0], 
+                                      params[(k1 * 2 + k2) * 2 + 1]) 
+                                  for k1, j in enumerate(Joint)} 
+                              for k2, s in enumerate(Side)},
+                      tau={
+                          'u': {Joint.HIP: 0.285, Joint.KNEE: 0.143},
+                          'v': {Joint.HIP: 0.302, Joint.KNEE: 0.151},
+                      }, a=(0.124, 0.770), u0=params[8], b=3.078,
+                      w_joint=-2.120, t_step=10 * b2.ms)
+
+
+def make_controller2(params):
+    return Controller(w=[-0.607, 0, 0, -0.311, -1.649, 0, -1.934, 0],
+                      u_init={s: {j: (0.0, 0.0) for j in Joint} for s in Side},
+                      tau={
+                          'u': {Joint.HIP: 0.285, Joint.KNEE: 0.143},
+                          'v': {Joint.HIP: 0.302, Joint.KNEE: 0.151},
+                      }, a=(params[2], params[3]), u0=params[1], b=3.078,
+                      w_joint=-2.120, t_step=params[0] * b2.ms)
+
+
+def calc_reward(params, time=5000, maker=make_controller4):
+    assert (len(params) == 10)
 
 #     with warnings.catch_warnings():
 #         warnings.filterwarnings(action='ignore', category=DeprecationWarning, module='.*brian2.*')
@@ -231,16 +265,16 @@ def calc_reward(params, n_iter=750):
     #                    }, a=params[20:22], u0=params[22], b=params[23],
     #                    w_joint=params[24], t_step=20 * b2.ms)
 
-    c = make_controller(params[:-1])
+    c = maker(params[:-1])
 
     observation = env.reset()
     total_reward = 0
 
-    for _ in range(n_iter):
+    for _ in range(750):
         y = c.step(observation)
         action = np.array([y[Side.LEFT][Joint.HIP], y[Side.LEFT][Joint.KNEE],
-                           y[Side.RIGHT][Joint.HIP], y[Side.RIGHT][Joint.KNEE]])
-        action = np.clip(action, -1, 1) * params[-1]
+                           y[Side.RIGHT][Joint.HIP], y[Side.RIGHT][Joint.KNEE]]) * params[-1]
+        action = np.clip(action, -1, 1)
         observation, reward, done, _ = env.step(action)
         total_reward += reward
         if done:
